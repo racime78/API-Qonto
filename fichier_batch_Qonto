@@ -1,0 +1,6 @@
+@echo off
+set api_key=xxxxxxxxxxxxxxxxx
+set login=xxxxxxxxxxxx
+set iban=xxxxxxxxxxxxxxxxxxxxxxxxxx
+call "C:\Users\xxxxx\xxxxxx\xxxx\xxx\xxxxxx\activate.bat"
+python "C:\Users\xxxx\xxxxxx\xxxxx\main.py" %api_key% %login% %iban%
