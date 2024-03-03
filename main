@@ -1,0 +1,91 @@
+import requests
+import pandas as pd
+import os
+import sys
+
+# Informations d'authentification et de requête
+api_key = "xxxxxx"
+login = "xxxxxxx"
+iban = "xxxxxx"
+
+
+# Assurez-vous que les arguments sont passés
+if len(sys.argv) == 4:
+    api_key = sys.argv[1]
+    login = sys.argv[2]
+    iban = sys.argv[3]
+
+# Utilisez ces variables comme avant dans votre script
+else:
+    print("Arguments manquants")
+    sys.exit(1)
+
+# Configuration de l'en-tête pour l'authentification
+headers = {
+    'Accept': "application/json",
+    'Authorization': f"{login}:{api_key}"
+}
+
+# Récupérer le solde actuel
+url_org = "https://thirdparty.qonto.com/v2/organization"
+response_org = requests.get(url_org, headers=headers)
+solde_actuel = 0
+if response_org.status_code == 200:
+    data_org = response_org.json()
+    for account in data_org['organization']['bank_accounts']:
+        if account['iban'] == iban:
+            solde_actuel = account['balance']
+            break
+
+# Récupérer les transactions
+url_transactions = f"https://thirdparty.qonto.com/v2/transactions?iban={iban}"
+response_transactions = requests.get(url_transactions, headers=headers)
+transactions_data = []
+if response_transactions.status_code == 200:
+    data_transactions = response_transactions.json()
+    for transaction in data_transactions['transactions']:
+        date = pd.to_datetime(transaction['emitted_at']).strftime('%d/%m/%Y')
+        amount = transaction['amount']
+        label = transaction['label']
+        operation_type = transaction.get('side')  # Cela pourrait être 'credit' ou 'debit'
+        side = 'Crédit' if operation_type == 'credit' else 'Débit'
+
+        transactions_data.append({
+            'Date': date,
+            'Montant': amount,
+            'Label': label,
+            'Type': side
+        })
+
+# Création du DataFrame avec les données filtrées
+df_transactions = pd.DataFrame(transactions_data)
+
+# Nom du fichier Excel
+file_name = "xxxx.xlsx"
+
+# Création de DataFrames séparés pour les crédits et les débits
+df_debits = df_transactions[df_transactions['Type'] == 'Débit']
+df_credits = df_transactions[df_transactions['Type'] == 'Crédit']
+
+# Définir le chemin du répertoire où enregistrer le fichier Excel
+desktop_path = "xxxxxxx"
+# Chemin complet du fichier sur le bureau
+file_path = os.path.join(desktop_path, "xxx.xlsx")
+
+# Vérifier si le fichier existe déjà
+if not os.path.isfile(file_path):
+    # Si le fichier n'existe pas, créez un nouveau fichier Excel avec les DataFrames
+    with pd.ExcelWriter(file_path, engine='xlsxwriter') as writer:
+        df_credits.to_excel(writer, sheet_name='Crédits', index=False)
+        df_debits.to_excel(writer, sheet_name='Débits', index=False)
+        pd.DataFrame({'Solde Actuel': [solde_actuel]}).to_excel(writer, sheet_name='Solde Actuel', index=False)
+else:
+    # Si le fichier existe, ouvrez le fichier existant et ajoutez ou remplacez les feuilles
+    with pd.ExcelWriter(file_path, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+        df_credits.to_excel(writer, sheet_name='Crédits', index=False)
+        df_debits.to_excel(writer, sheet_name='Débits', index=False)
+        # Écraser ou créer la feuille de solde actuel
+        pd.DataFrame({'Solde Actuel': [solde_actuel]}).to_excel(writer, sheet_name='Solde Actuel', index=False)
+
+# Afficher un message de succès
+print("Le fichier Excel a été créé ou mis à jour sur votre bureau."
